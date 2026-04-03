@@ -72,7 +72,7 @@ def il_cbs_api(
         raise ValueError("lang must be 'en' or 'he'")
     
     # Base URL and parameters
-    base_url = "https://apis.cbs.gov.il/series/data/list"
+    base_url = "https://apis.cbs.gov.il/series/data/list?PageSize=1000"
     
     # Common parameters - only include non-None optional parameters
     base_params = {
