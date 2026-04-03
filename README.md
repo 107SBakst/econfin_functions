@@ -82,6 +82,12 @@ from econfin_functions import il_cbs_api
 
 # Get full time series data (no date restrictions)
 data = il_cbs_api(3763)
+
+# Access metadata DataFrame
+print("Metadata DataFrame:")
+print(data.meta)
+
+# Access specific metadata values
 print(f"Series: {data.meta['series_name'].iloc[0]}")
 print(f"Unit: {data.meta['unit'].iloc[0]}")
 ```
