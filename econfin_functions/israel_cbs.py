@@ -7,8 +7,10 @@ This module provides functions to access time series data from Israel's CBS API.
 import requests
 import pandas as pd
 import xml.etree.ElementTree as ET
-from typing import Optional, Union, Tuple
+from typing import Optional, Union
 import warnings
+
+
 
 
 def il_cbs_api(
@@ -18,7 +20,7 @@ def il_cbs_api(
     format_type: str = "json",
     download: bool = False,
     lang: str = "en"
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> pd.DataFrame:
     """
     Fetch time series data and metadata from Israel's Central Bureau of Statistics API.
     
@@ -39,18 +41,23 @@ def il_cbs_api(
         
     Returns:
     --------
-    tuple of (pd.DataFrame, pd.DataFrame)
-        - First DataFrame: Time series data with TimePeriod and Value columns
-        - Second DataFrame: Metadata about the series with .meta suffix in name
+    pd.DataFrame
+        Time series data with TimePeriod, Value, series_id, and series_name columns.
+        Metadata is accessible via the .meta attribute (e.g., data_df.meta)
         
     Example:
     --------
     >>> # Single series
-    >>> data_df, meta_df = il_cbs_api(3763, startPeriod='2023-01', endPeriod='2024-12')
+    >>> data_df = il_cbs_api(3763, startPeriod='2023-01', endPeriod='2024-12')
+    >>> print(data_df.head())
+    >>> print(data_df.meta)  # Access metadata
+    >>> 
     >>> # Multiple series
-    >>> data_df, meta_df = il_cbs_api('62902,62916')
+    >>> data_df = il_cbs_api('62902,62916')
+    >>> print(data_df.meta)  # Metadata for all series
+    >>> 
     >>> # Full time series (no date parameters)
-    >>> data_df, meta_df = il_cbs_api(3763)
+    >>> data_df = il_cbs_api(3763)
     """
     
     # Convert series_id to string for API, preserving commas and text
@@ -100,9 +107,10 @@ def il_cbs_api(
         data_df = _process_json_data(data_response.json())
         meta_df = _process_json_metadata(meta_response.json())
         
-        # The series_id is already included in the processed data
+        # Attach metadata to the DataFrame using object.__setattr__ to avoid warnings
+        object.__setattr__(data_df, 'meta', meta_df)
         
-        return data_df, meta_df
+        return data_df
         
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"Failed to fetch data from CBS API: {e}")
@@ -133,8 +141,12 @@ def _process_json_data(json_response: dict) -> pd.DataFrame:
         
         df = pd.DataFrame(all_data)
         
-        # Convert TimePeriod to datetime if possible
-        if not df.empty:
+        # Handle empty results
+        if df.empty:
+            # Create empty DataFrame with expected structure
+            df = pd.DataFrame(columns=['TimePeriod', 'Value', 'series_id', 'series_name'])
+        else:
+            # Convert TimePeriod to datetime if possible
             try:
                 df['TimePeriod'] = pd.to_datetime(df['TimePeriod'])
             except:
@@ -260,12 +272,12 @@ def _get_xml_text(element: ET.Element, path: str) -> str:
         return ''
 
 
-# For backward compatibility and convenience
-def il_cbs_api_simple(series_id: Union[str, int], **kwargs) -> pd.DataFrame:
+# For backward compatibility - now returns tuple for those expecting the old format
+def il_cbs_api_legacy(series_id: Union[str, int], **kwargs) -> tuple:
     """
-    Simplified version that returns only the data DataFrame.
+    Legacy version that returns tuple of (data_df, meta_df) for backward compatibility.
     
-    Parameters same as il_cbs_api, returns only the time series data.
+    Parameters same as il_cbs_api, returns tuple of (data DataFrame, metadata DataFrame).
     """
-    data_df, _ = il_cbs_api(series_id, **kwargs)
-    return data_df
+    data_df = il_cbs_api(series_id, **kwargs)
+    return data_df, data_df.meta

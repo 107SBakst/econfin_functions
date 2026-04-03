@@ -26,16 +26,16 @@ Access time series data from Israel's Central Bureau of Statistics through their
 from econfin_functions import il_cbs_api
 
 # Fetch Israeli population data (series 3763) for recent years
-data_df, meta_df = il_cbs_api(
+data = il_cbs_api(
     series_id=3763,
     startPeriod='2020-01',
     endPeriod='2024-12'
 )
 
 print("Data:")
-print(data_df.head())
+print(data.head())
 print("\nMetadata:")
-print(meta_df.head())
+print(data.meta.head())
 ```
 
 ## API Reference
@@ -55,22 +55,23 @@ Fetch time series data and metadata from Israel's Central Bureau of Statistics A
 
 #### Returns
 
-A tuple of two pandas DataFrames:
-1. **Data DataFrame**: Time series data with columns:
-   - `TimePeriod`: Time period (converted to datetime when possible)
-   - `Value`: Data values
-   - `series_id`: Reference to the series ID
-   - `series_name`: Series name for easy identification
+A specialized pandas DataFrame with time series data and metadata:
 
-2. **Metadata DataFrame**: Series metadata with columns:
-   - `id`: Series ID
-   - `time_unit`: Time unit (e.g., "Month")
-   - `data_type`: Data type (e.g., "Original Data")
-   - `unit`: Measurement unit (e.g., "Thousands")
-   - `precision`: Data precision
-   - `last_update`: Last update date
-   - `level1-4`: Hierarchical categorization
-   - `series_name`: Series name
+**Data DataFrame** columns:
+- `TimePeriod`: Time period (converted to datetime when possible)
+- `Value`: Data values
+- `series_id`: Reference to the series ID
+- `series_name`: Series name for easy identification
+
+**Metadata** (accessible via `.meta` attribute):
+- `id`: Series ID
+- `time_unit`: Time unit (e.g., "Month")
+- `data_type`: Data type (e.g., "Original Data")
+- `unit`: Measurement unit (e.g., "Thousands")
+- `precision`: Data precision
+- `last_update`: Last update date
+- `level1-4`: Hierarchical categorization
+- `series_name`: Series name
 
 ## Examples
 
@@ -80,39 +81,43 @@ A tuple of two pandas DataFrames:
 from econfin_functions import il_cbs_api
 
 # Get full time series data (no date restrictions)
-data, metadata = il_cbs_api(3763)
+data = il_cbs_api(3763)
+print(f"Series: {data.meta['series_name'].iloc[0]}")
+print(f"Unit: {data.meta['unit'].iloc[0]}")
 ```
 
 ### Multiple Series
 
 ```python
 # Get data for multiple series at once
-data, metadata = il_cbs_api('62902,62916', startPeriod='2023-01')
+data = il_cbs_api('62902,62916', startPeriod='2023-01')
 
 # The data will include all series with series_id and series_name columns
 print(data.head())
 print(f"Series included: {data['series_id'].unique()}")
+print("Metadata for all series:")
+print(data.meta[['id', 'series_name', 'unit']])
 ```
 
 ### Specify Time Range
 
 ```python
 # Get data for specific time period
-data, metadata = il_cbs_api(
+data = il_cbs_api(
     series_id=3763,
     startPeriod='2023-01',
     endPeriod='2024-12'
 )
+print(f"Data points: {len(data)}")
+print(f"Metadata: {data.meta['series_name'].iloc[0]}")
 ```
 
 ### Hebrew Language
 
 ```python
 # Get data in Hebrew
-data, metadata = il_cbs_api(
-    series_id=3763,
-    lang='he'
-)
+data = il_cbs_api(series_id=3763, lang='he')
+print(data.meta['series_name'].iloc[0])  # Hebrew series name
 ```
 
 ### Working with the Data
@@ -121,19 +126,19 @@ data, metadata = il_cbs_api(
 import matplotlib.pyplot as plt
 
 # Fetch and plot population data
-data, meta = il_cbs_api(3763, startPeriod='2020-01')
+data = il_cbs_api(3763, startPeriod='2020-01')
 
 # Basic info
-print(f"Series: {meta['series_name'].iloc[0]}")
-print(f"Unit: {meta['unit'].iloc[0]}")
+print(f"Series: {data.meta['series_name'].iloc[0]}")
+print(f"Unit: {data.meta['unit'].iloc[0]}")
 print(f"Data points: {len(data)}")
 
 # Plot the data
 plt.figure(figsize=(12, 6))
 plt.plot(data['TimePeriod'], data['Value'])
-plt.title(f"{meta['series_name'].iloc[0]} - {meta['unit'].iloc[0]}")
+plt.title(f"{data.meta['series_name'].iloc[0]} - {data.meta['unit'].iloc[0]}")
 plt.xlabel('Time Period')
-plt.ylabel(f"Value ({meta['unit'].iloc[0]})")
+plt.ylabel(f"Value ({data.meta['unit'].iloc[0]})")
 plt.xticks(rotation=45)
 plt.tight_layout()
 plt.show()
@@ -168,7 +173,7 @@ The function includes comprehensive error handling:
 
 ```python
 try:
-    data, metadata = il_cbs_api('invalid_series')
+    data = il_cbs_api('invalid_series')
 except RuntimeError as e:
     print(f"API Error: {e}")
 except ValueError as e:
