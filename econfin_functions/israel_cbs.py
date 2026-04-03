@@ -25,13 +25,13 @@ def il_cbs_api(
     Parameters:
     -----------
     series_id : str or int
-        The CBS series ID (e.g., '3763' or 3763)
+        The CBS series ID (e.g., '3763', 3763, or '62902,62916' for multiple series)
     startPeriod : str, optional
-        Start period in YYYY-MM format (e.g., '2020-01')
+        Start period in YYYY-MM format (e.g., '2020-01'). If None, retrieves full time series.
     endPeriod : str, optional  
-        End period in YYYY-MM format (e.g., '2024-12')
+        End period in YYYY-MM format (e.g., '2024-12'). If None, retrieves full time series.
     format_type : str, default 'json'
-        Response format - 'json' or 'xml'
+        Response format - 'json' or 'xml' (json is recommended)
     download : bool, default False
         Whether to download data (True) or just fetch (False)
     lang : str, default 'en'
@@ -45,12 +45,15 @@ def il_cbs_api(
         
     Example:
     --------
+    >>> # Single series
     >>> data_df, meta_df = il_cbs_api(3763, startPeriod='2023-01', endPeriod='2024-12')
-    >>> print(data_df.head())
-    >>> print(meta_df.head())
+    >>> # Multiple series
+    >>> data_df, meta_df = il_cbs_api('62902,62916')
+    >>> # Full time series (no date parameters)
+    >>> data_df, meta_df = il_cbs_api(3763)
     """
     
-    # Convert series_id to string for API
+    # Convert series_id to string for API, preserving commas and text
     series_id_str = str(series_id)
     
     # Validate format_type
@@ -64,18 +67,18 @@ def il_cbs_api(
     # Base URL and parameters
     base_url = "https://apis.cbs.gov.il/series/data/list"
     
-    # Common parameters
+    # Common parameters - only include non-None optional parameters
     base_params = {
         'id': series_id_str,
-        'format': format_type.lower(),
+        'format': 'json',  # Force JSON format for consistent processing
         'download': str(download).lower(),
         'lang': lang.lower()
     }
     
-    # Add optional time period parameters
-    if startPeriod:
+    # Add optional time period parameters only if specified
+    if startPeriod is not None:
         base_params['startPeriod'] = startPeriod
-    if endPeriod:
+    if endPeriod is not None:
         base_params['endPeriod'] = endPeriod
     
     try:
@@ -93,17 +96,11 @@ def il_cbs_api(
         meta_response = requests.get(base_url, params=meta_params)
         meta_response.raise_for_status()
         
-        # Process responses based on format
-        if format_type.lower() == 'json':
-            data_df = _process_json_data(data_response.json())
-            meta_df = _process_json_metadata(meta_response.json())
-        else:  # xml
-            data_df = _process_xml_data(data_response.text)
-            meta_df = _process_xml_metadata(meta_response.text)
+        # Process responses - always use JSON processing since we force JSON format
+        data_df = _process_json_data(data_response.json())
+        meta_df = _process_json_metadata(meta_response.json())
         
-        # Add series_id for reference
-        data_df['series_id'] = series_id_str
-        meta_df['series_id'] = series_id_str
+        # The series_id is already included in the processed data
         
         return data_df, meta_df
         
@@ -116,18 +113,25 @@ def il_cbs_api(
 def _process_json_data(json_response: dict) -> pd.DataFrame:
     """Process JSON response to extract time series data."""
     try:
-        series = json_response['DataSet']['Series'][0]
-        observations = series.get('obs', [])
+        all_series = json_response['DataSet']['Series']
         
-        # Extract time series data
-        data_list = []
-        for obs in observations:
-            data_list.append({
-                'TimePeriod': obs['TimePeriod'],
-                'Value': obs['Value']
-            })
+        # Handle both single and multiple series
+        all_data = []
+        for series in all_series:
+            observations = series.get('obs', [])
+            series_id = series.get('id', '')
+            series_name = series.get('path', {}).get('name_id', {}).get('name', '')
+            
+            # Extract time series data for this series
+            for obs in observations:
+                all_data.append({
+                    'TimePeriod': obs['TimePeriod'],
+                    'Value': obs['Value'],
+                    'series_id': str(series_id),
+                    'series_name': series_name
+                })
         
-        df = pd.DataFrame(data_list)
+        df = pd.DataFrame(all_data)
         
         # Convert TimePeriod to datetime if possible
         if not df.empty:
@@ -137,8 +141,8 @@ def _process_json_data(json_response: dict) -> pd.DataFrame:
                 # Keep as string if conversion fails
                 pass
             
-            # Sort by time period
-            df = df.sort_values('TimePeriod').reset_index(drop=True)
+            # Sort by time period and series_id
+            df = df.sort_values(['series_id', 'TimePeriod']).reset_index(drop=True)
         
         return df
         
@@ -149,25 +153,28 @@ def _process_json_data(json_response: dict) -> pd.DataFrame:
 def _process_json_metadata(json_response: dict) -> pd.DataFrame:
     """Process JSON response to extract metadata."""
     try:
-        series = json_response['DataSet']['Series'][0]
+        all_series = json_response['DataSet']['Series']
         
-        # Extract metadata
-        metadata = {
-            'id': series.get('id'),
-            'time_unit': series.get('time', {}).get('name', ''),
-            'data_type': series.get('data', {}).get('name', ''),
-            'unit': series.get('unit', {}).get('name', ''),
-            'precision': series.get('precis', ''),
-            'last_update': series.get('update', ''),
-            'level1': series.get('path', {}).get('level1', {}).get('name', ''),
-            'level2': series.get('path', {}).get('level2', {}).get('name', ''),
-            'level3': series.get('path', {}).get('level3', {}).get('name', ''),
-            'level4': series.get('path', {}).get('level4', {}).get('name', ''),
-            'series_name': series.get('path', {}).get('name_id', {}).get('name', '')
-        }
+        # Handle both single and multiple series metadata
+        all_metadata = []
+        for series in all_series:
+            metadata = {
+                'id': series.get('id'),
+                'time_unit': series.get('time', {}).get('name', ''),
+                'data_type': series.get('data', {}).get('name', ''),
+                'unit': series.get('unit', {}).get('name', ''),
+                'precision': series.get('precis', ''),
+                'last_update': series.get('update', ''),
+                'level1': series.get('path', {}).get('level1', {}).get('name', ''),
+                'level2': series.get('path', {}).get('level2', {}).get('name', ''),
+                'level3': series.get('path', {}).get('level3', {}).get('name', ''),
+                'level4': series.get('path', {}).get('level4', {}).get('name', ''),
+                'series_name': series.get('path', {}).get('name_id', {}).get('name', '')
+            }
+            all_metadata.append(metadata)
         
         # Create DataFrame from metadata
-        meta_df = pd.DataFrame([metadata])
+        meta_df = pd.DataFrame(all_metadata)
         
         return meta_df
         

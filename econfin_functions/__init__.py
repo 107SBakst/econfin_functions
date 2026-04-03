@@ -5,7 +5,7 @@ This package provides functions to access and process economic and financial dat
 from various sources, starting with Israel's Central Bureau of Statistics (CBS) API.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Samuel Bakst"
 __email__ = "107sbakst@gmail.com"
 

@@ -29,8 +29,7 @@ from econfin_functions import il_cbs_api
 data_df, meta_df = il_cbs_api(
     series_id=3763,
     startPeriod='2020-01',
-    endPeriod='2024-12',
-    format_type='json'
+    endPeriod='2024-12'
 )
 
 print("Data:")
@@ -47,10 +46,10 @@ Fetch time series data and metadata from Israel's Central Bureau of Statistics A
 
 #### Parameters
 
-- **series_id** (str or int): The CBS series ID (e.g., '3763' for population data)
-- **startPeriod** (str, optional): Start period in YYYY-MM format (e.g., '2020-01')
-- **endPeriod** (str, optional): End period in YYYY-MM format (e.g., '2024-12')  
-- **format_type** (str, default 'json'): Response format - 'json' or 'xml'
+- **series_id** (str or int): The CBS series ID (e.g., '3763' for single series, or '62902,62916' for multiple series)
+- **startPeriod** (str, optional): Start period in YYYY-MM format (e.g., '2020-01'). If None, retrieves full time series.
+- **endPeriod** (str, optional): End period in YYYY-MM format (e.g., '2024-12'). If None, retrieves full time series.
+- **format_type** (str, default 'json'): Response format preference (function always uses JSON internally for consistency)
 - **download** (bool, default False): Whether to download data (True) or just fetch (False)
 - **lang** (str, default 'en'): Language - 'en' for English, 'he' for Hebrew
 
@@ -61,6 +60,7 @@ A tuple of two pandas DataFrames:
    - `TimePeriod`: Time period (converted to datetime when possible)
    - `Value`: Data values
    - `series_id`: Reference to the series ID
+   - `series_name`: Series name for easy identification
 
 2. **Metadata DataFrame**: Series metadata with columns:
    - `id`: Series ID
@@ -71,7 +71,6 @@ A tuple of two pandas DataFrames:
    - `last_update`: Last update date
    - `level1-4`: Hierarchical categorization
    - `series_name`: Series name
-   - `series_id`: Reference to the series ID
 
 ## Examples
 
@@ -80,8 +79,19 @@ A tuple of two pandas DataFrames:
 ```python
 from econfin_functions import il_cbs_api
 
-# Get population data with default settings
+# Get full time series data (no date restrictions)
 data, metadata = il_cbs_api(3763)
+```
+
+### Multiple Series
+
+```python
+# Get data for multiple series at once
+data, metadata = il_cbs_api('62902,62916', startPeriod='2023-01')
+
+# The data will include all series with series_id and series_name columns
+print(data.head())
+print(f"Series included: {data['series_id'].unique()}")
 ```
 
 ### Specify Time Range
@@ -92,17 +102,6 @@ data, metadata = il_cbs_api(
     series_id=3763,
     startPeriod='2023-01',
     endPeriod='2024-12'
-)
-```
-
-### XML Format
-
-```python
-# Use XML format instead of JSON
-data, metadata = il_cbs_api(
-    series_id=3763,
-    format_type='xml',
-    startPeriod='2024-01'
 )
 ```
 
@@ -154,6 +153,7 @@ Some common series IDs:
 - `3763`: Total population  
 - `3764`: Jewish population
 - `3765`: Arab population
+- `62902,62916`: Multiple economic indicators (GDP components)
 
 ## Requirements
 
