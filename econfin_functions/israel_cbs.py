@@ -130,6 +130,10 @@ def _process_json_data(json_response: dict) -> pd.DataFrame:
             series_id = series.get('id', '')
             series_name = series.get('path', {}).get('name_id', {}).get('name', '')
             
+            # Handle case where observations is None (CBS API issue with mixed frequencies)
+            if observations is None:
+                observations = []
+            
             # Extract time series data for this series
             for obs in observations:
                 all_data.append({

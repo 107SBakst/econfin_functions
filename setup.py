@@ -8,7 +8,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="econfin_functions",
-    version="0.3.0",
+    version="0.3.1",
     author="Samuel Bakst",
     author_email="107sbakst@gmail.com",
     description="A Python package for economic and financial data functions",
